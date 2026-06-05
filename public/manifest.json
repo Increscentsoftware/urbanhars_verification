@@ -1,0 +1,17 @@
+{
+  "name": "Urban Hars Partner Portal",
+  "short_name": "Urban Hars",
+  "description": "Register as a verified technician with Urban Hars",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E01E1E",
+  "icons": [
+    {
+      "src": "/uh-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

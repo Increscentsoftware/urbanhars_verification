@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Content \"d:\\\\Web Development files\\\\UrbanHars\\\\urbanhars-portal\\\\urbanhars\\\\.env.local\" | Select-String -Pattern \"SUPABASE\" | ForEach-Object { \\($_ -split '='\\)[0] })"
+    ]
+  }
+}
