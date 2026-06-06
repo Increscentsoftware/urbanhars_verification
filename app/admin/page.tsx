@@ -110,9 +110,6 @@ export default function AdminLogin() {
             }
           </button>
 
-          <p className="text-center text-xs text-slate-600 pt-1">
-            admin@urbanhars.com · UrbanHars@2024!
-          </p>
         </form>
       </div>
     </div>

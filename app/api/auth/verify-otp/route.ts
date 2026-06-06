@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-if (!(global as any).__OTP_STORE__) {
-  (global as any).__OTP_STORE__ = new Map()
-}
-
-function getStore(): Map<string, { otp: string; expires: number; attempts: number; lastSent: number }> {
-  return (global as any).__OTP_STORE__
-}
+import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,15 +9,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Phone number and OTP are required' }, { status: 400 })
     }
 
-    const store = getStore()
-    const record = store.get(phone_number)
+    const supabase = createServiceClient()
+
+    const { data: record } = await supabase
+      .from('otp_sessions')
+      .select('*')
+      .eq('phone_number', phone_number)
+      .single()
 
     if (!record) {
       return NextResponse.json({ error: 'No OTP found for this number. Please request a new OTP.' }, { status: 400 })
     }
 
-    if (Date.now() > record.expires) {
-      store.delete(phone_number)
+    if (new Date(record.expires_at).getTime() < Date.now()) {
+      await supabase.from('otp_sessions').delete().eq('phone_number', phone_number)
       return NextResponse.json({ error: 'OTP has expired. Please request a new one.' }, { status: 400 })
     }
 
@@ -32,8 +30,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Incorrect OTP. Please try again.' }, { status: 400 })
     }
 
-    // Valid - clear OTP
-    store.delete(phone_number)
+    // Valid — clear OTP
+    await supabase.from('otp_sessions').delete().eq('phone_number', phone_number)
 
     return NextResponse.json({
       success: true,
