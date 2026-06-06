@@ -111,3 +111,23 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  if (!isAdmin(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const { id } = await req.json()
+    if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+
+    const supabase = getAdminClient()
+    const { error } = await supabase.from('technicians').delete().eq('id', id)
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('Admin DELETE error:', err)
+    return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
+  }
+}

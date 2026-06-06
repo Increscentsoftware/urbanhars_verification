@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [selected, setSelected] = useState<any | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [notes, setNotes] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const router = useRouter()
 
   const fetchData = useCallback(async () => {
@@ -57,6 +58,28 @@ export default function AdminDashboard() {
     }
   }
 
+  async function deleteTechnician() {
+    if (!selected) return
+    setActionLoading(true)
+    const token = localStorage.getItem('admin_token') || ''
+    try {
+      const res = await fetch('/api/admin/technicians', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+        body: JSON.stringify({ id: selected.id })
+      })
+      if (res.ok) {
+        setSelected(null)
+        setDeleteConfirm(false)
+        fetchData()
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   function logout() {
     localStorage.removeItem('admin_token')
     router.push('/admin')
@@ -84,6 +107,39 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Delete Confirm Modal */}
+      {deleteConfirm && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#dc2626"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg">Delete Technician?</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                This will permanently delete <strong>{selected.full_name}</strong> ({selected.reference_id}) and all their data. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                disabled={actionLoading}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteTechnician}
+                disabled={actionLoading}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-semibold text-sm hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {actionLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -148,7 +204,7 @@ export default function AdminDashboard() {
             ) : technicians.map(tech => (
               <button
                 key={tech.id}
-                onClick={() => { setSelected(tech); setNotes(tech.approval_notes || '') }}
+                onClick={() => { setSelected(tech); setNotes(tech.approval_notes || ''); setDeleteConfirm(false) }}
                 className="w-full bg-white rounded-xl p-3 shadow-sm border-2 text-left transition-all hover:shadow-md"
                 style={{ borderColor: selected?.id === tech.id ? '#E01E1E' : 'transparent' }}
               >
@@ -183,7 +239,7 @@ export default function AdminDashboard() {
                     ) : (
                       <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-3xl">👤</div>
                     )}
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-bold text-gray-900">{selected.full_name}</p>
                       <p className="text-xs font-mono text-blue-600">{selected.reference_id}</p>
                       {statusBadge(selected.verification_status)}
@@ -195,6 +251,14 @@ export default function AdminDashboard() {
                     <div className="flex justify-between"><span className="text-gray-500">Location</span><span className="font-medium">{selected.city}, {selected.state}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">Experience</span><span className="font-medium">{selected.experience}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">Registered</span><span className="font-medium">{formatDate(selected.created_at)}</span></div>
+                    {selected.location_timestamp && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Last Location</span>
+                        <span className="font-medium text-green-600">
+                          🟢 {new Date(selected.location_timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Score */}
@@ -253,7 +317,7 @@ export default function AdminDashboard() {
                         className="h-20 bg-green-50 rounded-xl border border-green-100 flex flex-col items-center justify-center gap-1 hover:bg-green-100 transition-colors"
                       >
                         <span className="text-2xl">📍</span>
-                        <span className="text-xs text-green-600 font-medium">View Location</span>
+                        <span className="text-xs text-green-600 font-medium">Live Location</span>
                       </a>
                     )}
                   </div>
@@ -298,6 +362,17 @@ export default function AdminDashboard() {
                       className="py-2 px-4 bg-blue-500 text-white font-semibold rounded-xl text-sm hover:bg-blue-600 disabled:opacity-40 transition-colors"
                     >
                       🔄 Restore
+                    </button>
+                  </div>
+
+                  {/* Delete */}
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <button
+                      onClick={() => setDeleteConfirm(true)}
+                      disabled={actionLoading}
+                      className="w-full py-2 px-4 rounded-xl text-sm font-semibold text-red-600 border-2 border-red-100 hover:bg-red-50 hover:border-red-200 disabled:opacity-40 transition-colors"
+                    >
+                      🗑️ Delete Technician
                     </button>
                   </div>
                 </div>

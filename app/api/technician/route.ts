@@ -114,6 +114,25 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const { phone_number, latitude, longitude } = await req.json()
+    if (!phone_number || latitude == null || longitude == null) {
+      return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    }
+    const supabase = createServiceClient()
+    const { error } = await supabase.from('technicians').update({
+      latitude,
+      longitude,
+      location_timestamp: new Date().toISOString(),
+    }).eq('phone_number', phone_number)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return NextResponse.json({ error: 'Failed to update location' }, { status: 500 })
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)

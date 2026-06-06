@@ -5,6 +5,14 @@ export const metadata: Metadata = {
   title: 'Urban Hars Partner Portal',
   description: 'Register as a verified technician with Urban Hars',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/uh-logo.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/uh-logo.svg',
+    shortcut: '/favicon.svg',
+  },
 }
 
 export const viewport: Viewport = {

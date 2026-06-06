@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getVerificationLabel, formatDate } from '@/lib/utils'
@@ -9,6 +9,43 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [technician, setTechnician] = useState<any>(null)
   const [error, setError] = useState('')
+  const [trackingActive, setTrackingActive] = useState(false)
+  const watchIdRef = useRef<number | null>(null)
+  const lastUpdateRef = useRef<number>(0)
+
+  useEffect(() => {
+    if (!technician || !phone) return
+
+    function sendLocation(lat: number, lng: number) {
+      const now = Date.now()
+      if (now - lastUpdateRef.current < 30000) return
+      lastUpdateRef.current = now
+      fetch('/api/technician', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone, latitude: lat, longitude: lng }),
+      }).catch(() => {})
+    }
+
+    if ('geolocation' in navigator) {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          setTrackingActive(true)
+          sendLocation(pos.coords.latitude, pos.coords.longitude)
+        },
+        () => setTrackingActive(false),
+        { enableHighAccuracy: true, maximumAge: 15000 }
+      )
+    }
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
+      }
+      setTrackingActive(false)
+    }
+  }, [technician, phone])
 
   async function fetchStatus() {
     if (!/^[6-9]\d{9}$/.test(phone)) {
@@ -117,6 +154,17 @@ export default function DashboardPage() {
                 </div>
               )
             })()}
+
+            {/* Location Tracking Indicator */}
+            {trackingActive && (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                </span>
+                <p className="text-green-700 text-xs font-semibold">Live location tracking active — updates every 30 seconds</p>
+              </div>
+            )}
 
             {/* Profile Card */}
             <div className="bg-white rounded-2xl p-5" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.07)' }}>
