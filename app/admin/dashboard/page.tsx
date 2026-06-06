@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getVerificationLabel, formatDate } from '@/lib/utils'
 
@@ -15,6 +15,8 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState(false)
   const [notes, setNotes] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [liveLocation, setLiveLocation] = useState<{ latitude: number; longitude: number; accuracy: number | null; updated_at: string } | null>(null)
+  const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const router = useRouter()
 
   const fetchData = useCallback(async () => {
@@ -36,6 +38,30 @@ export default function AdminDashboard() {
   }, [filter, search])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const fetchLiveLocation = useCallback(async (phone: string) => {
+    const token = localStorage.getItem('admin_token') || ''
+    try {
+      const res = await fetch(`/api/admin/location?phone=${phone}`, {
+        headers: { 'x-admin-token': token }
+      })
+      const data = await res.json()
+      setLiveLocation(data.live ?? null)
+    } catch {
+      setLiveLocation(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (liveIntervalRef.current) clearInterval(liveIntervalRef.current)
+    setLiveLocation(null)
+    if (!selected?.phone_number) return
+    fetchLiveLocation(selected.phone_number)
+    liveIntervalRef.current = setInterval(() => fetchLiveLocation(selected.phone_number), 30000)
+    return () => {
+      if (liveIntervalRef.current) clearInterval(liveIntervalRef.current)
+    }
+  }, [selected?.phone_number, fetchLiveLocation])
 
   async function performAction(id: string, action: string) {
     setActionLoading(true)
@@ -248,17 +274,9 @@ export default function AdminDashboard() {
 
                   <div className="space-y-1.5 text-xs">
                     <div className="flex justify-between"><span className="text-gray-500">Phone</span><span className="font-medium">+91 {selected.phone_number}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Location</span><span className="font-medium">{selected.city}, {selected.state}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Address</span><span className="font-medium">{selected.city}, {selected.state}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">Experience</span><span className="font-medium">{selected.experience}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">Registered</span><span className="font-medium">{formatDate(selected.created_at)}</span></div>
-                    {selected.location_timestamp && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Last Location</span>
-                        <span className="font-medium text-green-600">
-                          🟢 {new Date(selected.location_timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Score */}
@@ -277,9 +295,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Documents */}
+                {/* Documents + Verification Location */}
                 <div className="p-5 border-b border-gray-100">
-                  <p className="font-semibold text-gray-700 mb-3 text-sm">Documents</p>
+                  <p className="font-semibold text-gray-700 mb-3 text-sm">Verification Documents</p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { label: 'Aadhaar Front', url: selected.aadhaar_front_url },
@@ -314,13 +332,62 @@ export default function AdminDashboard() {
                         href={`https://maps.google.com/?q=${selected.latitude},${selected.longitude}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="h-20 bg-green-50 rounded-xl border border-green-100 flex flex-col items-center justify-center gap-1 hover:bg-green-100 transition-colors"
+                        className="h-20 bg-blue-50 rounded-xl border border-blue-100 flex flex-col items-center justify-center gap-1 hover:bg-blue-100 transition-colors"
                       >
                         <span className="text-2xl">📍</span>
-                        <span className="text-xs text-green-600 font-medium">Live Location</span>
+                        <span className="text-xs text-blue-600 font-medium">Reg. Location</span>
                       </a>
                     )}
                   </div>
+                </div>
+
+                {/* Live Location Tracking */}
+                <div className="p-5 border-b border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-semibold text-gray-700 text-sm">Live Location</p>
+                    {liveLocation && (
+                      <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                        Live
+                      </span>
+                    )}
+                  </div>
+                  {liveLocation ? (
+                    <div className="space-y-2">
+                      <div className="bg-green-50 rounded-xl p-3 text-xs space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Last Update</span>
+                          <span className="font-semibold text-green-700">
+                            {new Date(liveLocation.updated_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </span>
+                        </div>
+                        {liveLocation.accuracy != null && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Accuracy</span>
+                            <span className="font-medium">±{Math.round(liveLocation.accuracy)}m</span>
+                          </div>
+                        )}
+                      </div>
+                      <a
+                        href={`https://maps.google.com/?q=${liveLocation.latitude},${liveLocation.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-green-500 text-white text-xs font-semibold hover:bg-green-600 transition-colors"
+                      >
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        Open in Google Maps
+                      </a>
+                      <p className="text-center text-xs text-gray-400">Refreshes every 30 seconds</p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-xl p-4 text-center">
+                      <p className="text-gray-400 text-xs">No live location yet.</p>
+                      <p className="text-gray-400 text-xs mt-1">Technician must open their dashboard to start sharing.</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}

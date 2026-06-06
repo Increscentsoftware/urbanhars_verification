@@ -16,14 +16,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!technician || !phone) return
 
-    function sendLocation(lat: number, lng: number) {
+    function sendLocation(lat: number, lng: number, acc: number | null) {
       const now = Date.now()
       if (now - lastUpdateRef.current < 30000) return
       lastUpdateRef.current = now
       fetch('/api/technician', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phone, latitude: lat, longitude: lng }),
+        body: JSON.stringify({ phone_number: phone, latitude: lat, longitude: lng, accuracy: acc }),
       }).catch(() => {})
     }
 
@@ -31,7 +31,7 @@ export default function DashboardPage() {
       watchIdRef.current = navigator.geolocation.watchPosition(
         (pos) => {
           setTrackingActive(true)
-          sendLocation(pos.coords.latitude, pos.coords.longitude)
+          sendLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy)
         },
         () => setTrackingActive(false),
         { enableHighAccuracy: true, maximumAge: 15000 }
